@@ -339,25 +339,21 @@ public class JdbcCarDao implements CarDao {
 
                 String sql = SELECT_COLUMNS + " ORDER BY car_id ASC";
 
+                List<Car> cars = new ArrayList<>();
+
                 try (Connection connection = ConnectionFactory.getConnection();
-
                                 PreparedStatement statement = connection.prepareStatement(sql);
-
                                 ResultSet resultSet = statement.executeQuery()) {
 
-                        List<Car> cars = new ArrayList<>();
-
                         while (resultSet.next()) {
-
                                 cars.add(mapRow(resultSet));
                         }
 
                         return cars;
 
                 } catch (SQLException e) {
-
                         throw new DataAccessException(
-                                        "Failed to retrieve all cars.",
+                                        "Failed to retrieve all cars. Cause: " + e.getMessage(),
                                         e);
                 }
         }

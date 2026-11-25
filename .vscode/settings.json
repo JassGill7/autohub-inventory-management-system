@@ -1,10 +1,15 @@
 {
-    "java.project.sourcePaths": [
-        "src",
-        "tests"
-    ],
-    "java.project.outputPath": "out",
-    "java.project.referencedLibraries": [
-        "lib/**/*.jar"
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Run AutoHub",
+            "request": "launch",
+            "mainClass": "com.autohub.AutoHubApplication",
+            "classPaths": [
+                "${workspaceFolder}/bin",
+                "${workspaceFolder}/lib/mysql-connector-j-9.7.0.jar"
+            ]
+        }
     ]
 }

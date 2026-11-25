@@ -5,6 +5,7 @@ import com.autohub.dao.CarDao;
 import com.autohub.model.Car;
 import com.autohub.validation.CarValidator;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -61,6 +62,10 @@ public class CarService {
         }
 
         return carDao.findByStockCode(stockCode.trim());
+    }
+
+    public List<Car> findAllCars() {
+        return carDao.findAll();
     }
 
 }
