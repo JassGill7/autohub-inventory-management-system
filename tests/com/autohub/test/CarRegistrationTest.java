@@ -29,7 +29,7 @@ public class CarRegistrationTest {
                 Car car = new Car();
 
                 // Generate a unique stock code for repeated testing
-                String stockCode = "AH-TEST-"
+                String stockCode = "AH-PERSIST-001"
                                 + UUID.randomUUID()
                                                 .toString()
                                                 .substring(0, 8)
