@@ -26,633 +26,657 @@ import java.util.Optional;
 
 public class JdbcCarDao implements CarDao {
 
-    // Columns retrieved from the cars table
-    private static final String SELECT_COLUMNS = """
-            SELECT car_id, stock_code, name, make, model,
-                   manufacture_year, vin, registration_number,
-                   fuel_type, transmission, colour,
-                   purchase_price, acquisition_date, listing_price,
-                   status, sold_date, sold_price, notes
-            FROM cars
-            """;
+        // Columns retrieved from the cars table
+        private static final String SELECT_COLUMNS = """
+                        SELECT car_id, stock_code, name, make, model,
+                               manufacture_year, vin, registration_number,
+                               fuel_type, transmission, colour,
+                               purchase_price, acquisition_date, listing_price,
+                               status, sold_date, sold_price, notes
+                        FROM cars
+                        """;
 
-    // ==========================================
-    // 1. INSERT - REGISTER A NEW CAR
-    // ==========================================
+        // ==========================================
+        // 1. INSERT - REGISTER A NEW CAR
+        // ==========================================
 
-    @Override
-    public long insert(Car car) {
+        @Override
+        public long insert(Car car) {
 
-        if (car == null) {
-            throw new IllegalArgumentException(
-                    "Car object cannot be null.");
-        }
-
-        String sql = """
-                INSERT INTO cars (
-                    stock_code, name, make, model,
-                    manufacture_year, vin, registration_number,
-                    fuel_type, transmission, colour,
-                    purchase_price, acquisition_date, listing_price,
-                    status, sold_date, sold_price, notes
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                        ?, ?, ?, ?, ?, ?, ?)
-                """;
-
-        try (Connection connection = ConnectionFactory.getConnection();
-
-                PreparedStatement statement = connection.prepareStatement(
-                        sql,
-                        Statement.RETURN_GENERATED_KEYS)) {
-
-            setCarParameters(statement, car, 1);
-
-            statement.executeUpdate();
-
-            // Retrieve automatically generated car_id
-            try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
-
-                if (generatedKeys.next()) {
-
-                    long generatedId = generatedKeys.getLong(1);
-
-                    car.setCarId(generatedId);
-
-                    return generatedId;
-                }
-            }
-
-            throw new SQLException(
-                    "Car insertion succeeded but no generated ID was returned.");
-
-        } catch (SQLException e) {
-
-            throw new DataAccessException(
-                    "Failed to register car.",
-                    e);
-        }
-    }
-
-    // ==========================================
-    // 2. SELECT - FIND CAR BY ID
-    // ==========================================
-
-    @Override
-    public Optional<Car> findById(long carId) {
-
-        if (carId <= 0) {
-            throw new IllegalArgumentException(
-                    "Car ID must be positive.");
-        }
-
-        String sql = SELECT_COLUMNS + " WHERE car_id = ?";
-
-        try (Connection connection = ConnectionFactory.getConnection();
-
-                PreparedStatement statement = connection.prepareStatement(sql)) {
-
-            statement.setLong(1, carId);
-
-            try (ResultSet resultSet = statement.executeQuery()) {
-
-                if (resultSet.next()) {
-
-                    return Optional.of(mapRow(resultSet));
+                if (car == null) {
+                        throw new IllegalArgumentException(
+                                        "Car object cannot be null.");
                 }
 
-                return Optional.empty();
-            }
+                String sql = """
+                                INSERT INTO cars (
+                                    stock_code, name, make, model,
+                                    manufacture_year, vin, registration_number,
+                                    fuel_type, transmission, colour,
+                                    purchase_price, acquisition_date, listing_price,
+                                    status, sold_date, sold_price, notes
+                                )
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                                        ?, ?, ?, ?, ?, ?, ?)
+                                """;
 
-        } catch (SQLException e) {
+                try (Connection connection = ConnectionFactory.getConnection();
 
-            throw new DataAccessException(
-                    "Failed to retrieve car with ID: " + carId,
-                    e);
-        }
-    }
+                                PreparedStatement statement = connection.prepareStatement(
+                                                sql,
+                                                Statement.RETURN_GENERATED_KEYS)) {
 
-    // ==========================================
-    // 3. SELECT - SEARCH CARS USING CRITERIA
-    // ==========================================
+                        setCarParameters(statement, car, 1);
 
-    @Override
-    public List<Car> search(CarSearchCriteria criteria) {
+                        statement.executeUpdate();
 
-        if (criteria == null) {
-            throw new IllegalArgumentException(
-                    "Search criteria cannot be null.");
-        }
+                        // Retrieve automatically generated car_id
+                        try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
 
-        BigDecimal minPrice = criteria.getMinListingPrice();
-        BigDecimal maxPrice = criteria.getMaxListingPrice();
+                                if (generatedKeys.next()) {
 
-        if (minPrice != null && maxPrice != null
-                && minPrice.compareTo(maxPrice) > 0) {
+                                        long generatedId = generatedKeys.getLong(1);
 
-            throw new IllegalArgumentException(
-                    "Minimum listing price cannot exceed maximum listing price.");
-        }
+                                        car.setCarId(generatedId);
 
-        StringBuilder sql = new StringBuilder(SELECT_COLUMNS);
+                                        return generatedId;
+                                }
+                        }
 
-        List<Object> parameters = new ArrayList<>();
+                        throw new SQLException(
+                                        "Car insertion succeeded but no generated ID was returned.");
 
-        // Stock code - exact match
-        if (hasText(criteria.getStockCode())) {
+                } catch (SQLException e) {
 
-            addCondition(
-                    sql,
-                    parameters,
-                    "stock_code = ?",
-                    criteria.getStockCode().trim());
-        }
-
-        // Make - partial match
-        if (hasText(criteria.getMake())) {
-
-            addCondition(
-                    sql,
-                    parameters,
-                    "make LIKE ?",
-                    "%" + criteria.getMake().trim() + "%");
+                        throw new DataAccessException(
+                                        "Failed to register car.",
+                                        e);
+                }
         }
 
-        // Model - partial match
-        if (hasText(criteria.getModel())) {
+        // ==========================================
+        // 2. SELECT - FIND CAR BY ID
+        // ==========================================
 
-            addCondition(
-                    sql,
-                    parameters,
-                    "model LIKE ?",
-                    "%" + criteria.getModel().trim() + "%");
-        }
+        @Override
+        public Optional<Car> findById(long carId) {
 
-        // Manufacture year
-        if (criteria.getManufactureYear() != null) {
-
-            addCondition(
-                    sql,
-                    parameters,
-                    "manufacture_year = ?",
-                    criteria.getManufactureYear());
-        }
-
-        // Car status
-        if (criteria.getStatus() != null) {
-
-            addCondition(
-                    sql,
-                    parameters,
-                    "status = ?",
-                    criteria.getStatus().getDatabaseValue());
-        }
-
-        // Minimum listing price
-        if (minPrice != null) {
-
-            addCondition(
-                    sql,
-                    parameters,
-                    "listing_price >= ?",
-                    minPrice);
-        }
-
-        // Maximum listing price
-        if (maxPrice != null) {
-
-            addCondition(
-                    sql,
-                    parameters,
-                    "listing_price <= ?",
-                    maxPrice);
-        }
-
-        sql.append(" ORDER BY car_id ASC");
-
-        try (Connection connection = ConnectionFactory.getConnection();
-
-                PreparedStatement statement = connection.prepareStatement(sql.toString())) {
-
-            // Bind search parameters
-            for (int i = 0; i < parameters.size(); i++) {
-
-                statement.setObject(
-                        i + 1,
-                        parameters.get(i));
-            }
-
-            try (ResultSet resultSet = statement.executeQuery()) {
-
-                List<Car> cars = new ArrayList<>();
-
-                while (resultSet.next()) {
-
-                    cars.add(mapRow(resultSet));
+                if (carId <= 0) {
+                        throw new IllegalArgumentException(
+                                        "Car ID must be positive.");
                 }
 
-                return cars;
-            }
+                String sql = SELECT_COLUMNS + " WHERE car_id = ?";
 
-        } catch (SQLException e) {
+                try (Connection connection = ConnectionFactory.getConnection();
 
-            throw new DataAccessException(
-                    "Failed to search cars.",
-                    e);
-        }
-    }
+                                PreparedStatement statement = connection.prepareStatement(sql)) {
 
-    // ==========================================
-    // 4. UPDATE - UPDATE EXISTING CAR
-    // ==========================================
+                        statement.setLong(1, carId);
 
-    @Override
-    public int update(Car car) {
+                        try (ResultSet resultSet = statement.executeQuery()) {
 
-        if (car == null) {
-            throw new IllegalArgumentException(
-                    "Car object cannot be null.");
-        }
+                                if (resultSet.next()) {
 
-        if (car.getCarId() == null || car.getCarId() <= 0) {
+                                        return Optional.of(mapRow(resultSet));
+                                }
 
-            throw new IllegalArgumentException(
-                    "Valid Car ID is required for updating.");
+                                return Optional.empty();
+                        }
+
+                } catch (SQLException e) {
+
+                        throw new DataAccessException(
+                                        "Failed to retrieve car with ID: " + carId,
+                                        e);
+                }
         }
 
-        String sql = """
-                UPDATE cars SET
+        // ==========================================
+        // 3. SELECT - SEARCH CARS USING CRITERIA
+        // ==========================================
+
+        @Override
+        public List<Car> search(CarSearchCriteria criteria) {
+
+                if (criteria == null) {
+                        throw new IllegalArgumentException(
+                                        "Search criteria cannot be null.");
+                }
+
+                BigDecimal minPrice = criteria.getMinListingPrice();
+                BigDecimal maxPrice = criteria.getMaxListingPrice();
 
-                    stock_code = ?,
-                    name = ?,
-                    make = ?,
-                    model = ?,
-                    manufacture_year = ?,
+                if (minPrice != null && maxPrice != null
+                                && minPrice.compareTo(maxPrice) > 0) {
 
-                    vin = ?,
-                    registration_number = ?,
+                        throw new IllegalArgumentException(
+                                        "Minimum listing price cannot exceed maximum listing price.");
+                }
 
-                    fuel_type = ?,
-                    transmission = ?,
-                    colour = ?,
+                StringBuilder sql = new StringBuilder(SELECT_COLUMNS);
 
-                    purchase_price = ?,
-                    acquisition_date = ?,
-                    listing_price = ?,
+                List<Object> parameters = new ArrayList<>();
 
-                    status = ?,
-                    sold_date = ?,
-                    sold_price = ?,
+                // Stock code - exact match
+                if (hasText(criteria.getStockCode())) {
 
-                    notes = ?
+                        addCondition(
+                                        sql,
+                                        parameters,
+                                        "stock_code = ?",
+                                        criteria.getStockCode().trim());
+                }
 
-                WHERE car_id = ?
-                """;
+                // Make - partial match
+                if (hasText(criteria.getMake())) {
 
-        try (Connection connection = ConnectionFactory.getConnection();
+                        addCondition(
+                                        sql,
+                                        parameters,
+                                        "make LIKE ?",
+                                        "%" + criteria.getMake().trim() + "%");
+                }
 
-                PreparedStatement statement = connection.prepareStatement(sql)) {
+                // Model - partial match
+                if (hasText(criteria.getModel())) {
 
-            int nextIndex = setCarParameters(statement, car, 1);
+                        addCondition(
+                                        sql,
+                                        parameters,
+                                        "model LIKE ?",
+                                        "%" + criteria.getModel().trim() + "%");
+                }
 
-            statement.setLong(
-                    nextIndex,
-                    car.getCarId());
+                // Manufacture year
+                if (criteria.getManufactureYear() != null) {
 
-            return statement.executeUpdate();
+                        addCondition(
+                                        sql,
+                                        parameters,
+                                        "manufacture_year = ?",
+                                        criteria.getManufactureYear());
+                }
 
-        } catch (SQLException e) {
+                // Car status
+                if (criteria.getStatus() != null) {
 
-            throw new DataAccessException(
-                    "Failed to update car with ID: "
-                            + car.getCarId(),
-                    e);
-        }
-    }
+                        addCondition(
+                                        sql,
+                                        parameters,
+                                        "status = ?",
+                                        criteria.getStatus().getDatabaseValue());
+                }
 
-    // ==========================================
-    // 5. SELECT - RETRIEVE ALL CARS
-    // ==========================================
+                // Minimum listing price
+                if (minPrice != null) {
 
-    @Override
-    public List<Car> findAll() {
+                        addCondition(
+                                        sql,
+                                        parameters,
+                                        "listing_price >= ?",
+                                        minPrice);
+                }
 
-        String sql = SELECT_COLUMNS + " ORDER BY car_id ASC";
+                // Maximum listing price
+                if (maxPrice != null) {
 
-        try (Connection connection = ConnectionFactory.getConnection();
+                        addCondition(
+                                        sql,
+                                        parameters,
+                                        "listing_price <= ?",
+                                        maxPrice);
+                }
 
-                PreparedStatement statement = connection.prepareStatement(sql);
+                sql.append(" ORDER BY car_id ASC");
 
-                ResultSet resultSet = statement.executeQuery()) {
+                try (Connection connection = ConnectionFactory.getConnection();
 
-            List<Car> cars = new ArrayList<>();
+                                PreparedStatement statement = connection.prepareStatement(sql.toString())) {
 
-            while (resultSet.next()) {
+                        // Bind search parameters
+                        for (int i = 0; i < parameters.size(); i++) {
 
-                cars.add(mapRow(resultSet));
-            }
+                                statement.setObject(
+                                                i + 1,
+                                                parameters.get(i));
+                        }
 
-            return cars;
+                        try (ResultSet resultSet = statement.executeQuery()) {
 
-        } catch (SQLException e) {
+                                List<Car> cars = new ArrayList<>();
 
-            throw new DataAccessException(
-                    "Failed to retrieve all cars.",
-                    e);
-        }
-    }
+                                while (resultSet.next()) {
 
-    // ==========================================
-    // HELPER 1 - MAP RESULTSET TO CAR OBJECT
-    // ==========================================
+                                        cars.add(mapRow(resultSet));
+                                }
 
-    private Car mapRow(ResultSet resultSet)
-            throws SQLException {
+                                return cars;
+                        }
 
-        Car car = new Car();
+                } catch (SQLException e) {
 
-        car.setCarId(
-                resultSet.getLong("car_id"));
-
-        car.setStockCode(
-                resultSet.getString("stock_code"));
-
-        car.setName(
-                resultSet.getString("name"));
-
-        car.setMake(
-                resultSet.getString("make"));
-
-        car.setModel(
-                resultSet.getString("model"));
-
-        car.setManufactureYear(
-                resultSet.getInt("manufacture_year"));
-
-        // Vehicle identification
-
-        car.setVin(
-                resultSet.getString("vin"));
-
-        car.setRegistrationNumber(
-                resultSet.getString("registration_number"));
-
-        // Vehicle specifications
-
-        car.setFuelType(
-                resultSet.getString("fuel_type"));
-
-        car.setTransmission(
-                resultSet.getString("transmission"));
-
-        car.setColour(
-                resultSet.getString("colour"));
-
-        // Financial information
-
-        car.setPurchasePrice(
-                resultSet.getBigDecimal("purchase_price"));
-
-        car.setListingPrice(
-                resultSet.getBigDecimal("listing_price"));
-
-        // Date information
-
-        car.setAcquisitionDate(
-                getLocalDate(resultSet, "acquisition_date"));
-
-        // Status mapping
-
-        car.setStatus(
-                CarStatus.fromDatabaseValue(
-                        resultSet.getString("status")));
-
-        // Sale information
-
-        car.setSoldDate(
-                getLocalDate(resultSet, "sold_date"));
-
-        car.setSoldPrice(
-                resultSet.getBigDecimal("sold_price"));
-
-        // Additional information
-
-        car.setNotes(
-                resultSet.getString("notes"));
-
-        return car;
-    }
-
-    // ==========================================
-    // HELPER 2 - SET CAR PARAMETERS
-    // ==========================================
-
-    private int setCarParameters(
-            PreparedStatement statement,
-            Car car,
-            int startIndex) throws SQLException {
-
-        int index = startIndex;
-
-        statement.setString(
-                index++,
-                trimToNull(car.getStockCode()));
-
-        statement.setString(
-                index++,
-                trimToNull(car.getName()));
-
-        statement.setString(
-                index++,
-                trimToNull(car.getMake()));
-
-        statement.setString(
-                index++,
-                trimToNull(car.getModel()));
-
-        statement.setInt(
-                index++,
-                car.getManufactureYear());
-
-        // VIN
-        setNullableString(
-                statement,
-                index++,
-                normalizeUpper(car.getVin()),
-                Types.CHAR);
-
-        // Registration number
-        setNullableString(
-                statement,
-                index++,
-                normalizeUpper(car.getRegistrationNumber()),
-                Types.VARCHAR);
-
-        // Fuel type and transmission
-        statement.setString(
-                index++,
-                normalizeUpper(car.getFuelType()));
-
-        statement.setString(
-                index++,
-                normalizeUpper(car.getTransmission()));
-
-        // Colour
-        setNullableString(
-                statement,
-                index++,
-                car.getColour(),
-                Types.VARCHAR);
-
-        // Purchase price
-        statement.setBigDecimal(
-                index++,
-                car.getPurchasePrice());
-
-        // Acquisition date
-        setNullableDate(
-                statement,
-                index++,
-                car.getAcquisitionDate());
-
-        // Listing price
-        statement.setBigDecimal(
-                index++,
-                car.getListingPrice());
-
-        // Status
-        statement.setString(
-                index++,
-                car.getStatus() == null
-                        ? null
-                        : car.getStatus().getDatabaseValue());
-
-        // Sold date
-        setNullableDate(
-                statement,
-                index++,
-                car.getSoldDate());
-
-        // Sold price
-        statement.setBigDecimal(
-                index++,
-                car.getSoldPrice());
-
-        // Notes
-        String notes = car.getNotes();
-
-        statement.setString(
-                index++,
-                notes == null || notes.isBlank() ? null : notes);
-
-        return index;
-    }
-
-    // ==========================================
-    // HELPER 3 - ADD SEARCH CONDITION
-    // ==========================================
-
-    private void addCondition(
-            StringBuilder sql,
-            List<Object> parameters,
-            String condition,
-            Object value) {
-
-        if (parameters.isEmpty()) {
-
-            sql.append(" WHERE ");
-
-        } else {
-
-            sql.append(" AND ");
+                        throw new DataAccessException(
+                                        "Failed to search cars.",
+                                        e);
+                }
         }
 
-        sql.append(condition);
+        // ==========================================
+        // 4. UPDATE - UPDATE EXISTING CAR
+        // ==========================================
 
-        parameters.add(value);
-    }
+        @Override
+        public int update(Car car) {
 
-    // ==========================================
-    // HELPER 4 - CHECK NON-EMPTY TEXT
-    // ==========================================
+                if (car == null) {
+                        throw new IllegalArgumentException(
+                                        "Car object cannot be null.");
+                }
 
-    private boolean hasText(String value) {
+                if (car.getCarId() == null || car.getCarId() <= 0) {
 
-        return value != null && !value.isBlank();
-    }
+                        throw new IllegalArgumentException(
+                                        "Valid Car ID is required for updating.");
+                }
 
-    // ==========================================
-    // HELPER 5 - NORMALIZE TEXT
-    // ==========================================
+                String sql = """
+                                UPDATE cars SET
 
-    private String trimToNull(String value) {
+                                    stock_code = ?,
+                                    name = ?,
+                                    make = ?,
+                                    model = ?,
+                                    manufacture_year = ?,
 
-        if (value == null || value.isBlank()) {
-            return null;
+                                    vin = ?,
+                                    registration_number = ?,
+
+                                    fuel_type = ?,
+                                    transmission = ?,
+                                    colour = ?,
+
+                                    purchase_price = ?,
+                                    acquisition_date = ?,
+                                    listing_price = ?,
+
+                                    status = ?,
+                                    sold_date = ?,
+                                    sold_price = ?,
+
+                                    notes = ?
+
+                                WHERE car_id = ?
+                                """;
+
+                try (Connection connection = ConnectionFactory.getConnection();
+
+                                PreparedStatement statement = connection.prepareStatement(sql)) {
+
+                        int nextIndex = setCarParameters(statement, car, 1);
+
+                        statement.setLong(
+                                        nextIndex,
+                                        car.getCarId());
+
+                        return statement.executeUpdate();
+
+                } catch (SQLException e) {
+
+                        throw new DataAccessException(
+                                        "Failed to update car with ID: "
+                                                        + car.getCarId(),
+                                        e);
+                }
         }
 
-        return value.trim();
-    }
+        // ==========================================
+        // 5. SELECT - RETRIEVE ALL CARS
+        // ==========================================
 
-    private String normalizeUpper(String value) {
+        @Override
+        public List<Car> findAll() {
 
-        if (value == null || value.isBlank()) {
-            return null;
+                String sql = SELECT_COLUMNS + " ORDER BY car_id ASC";
+
+                try (Connection connection = ConnectionFactory.getConnection();
+
+                                PreparedStatement statement = connection.prepareStatement(sql);
+
+                                ResultSet resultSet = statement.executeQuery()) {
+
+                        List<Car> cars = new ArrayList<>();
+
+                        while (resultSet.next()) {
+
+                                cars.add(mapRow(resultSet));
+                        }
+
+                        return cars;
+
+                } catch (SQLException e) {
+
+                        throw new DataAccessException(
+                                        "Failed to retrieve all cars.",
+                                        e);
+                }
         }
 
-        return value.trim().toUpperCase(Locale.ROOT);
-    }
+        // ==========================================
+        // HELPER 1 - MAP RESULTSET TO CAR OBJECT
+        // ==========================================
 
-    // ==========================================
-    // HELPER 6 - SET NULLABLE STRING
-    // ==========================================
+        private Car mapRow(ResultSet resultSet)
+                        throws SQLException {
 
-    private void setNullableString(
-            PreparedStatement statement,
-            int index,
-            String value,
-            int sqlType) throws SQLException {
+                Car car = new Car();
 
-        if (value == null || value.isBlank()) {
+                car.setCarId(
+                                resultSet.getLong("car_id"));
 
-            statement.setNull(index, sqlType);
+                car.setStockCode(
+                                resultSet.getString("stock_code"));
 
-        } else {
+                car.setName(
+                                resultSet.getString("name"));
 
-            statement.setString(index, value.trim());
+                car.setMake(
+                                resultSet.getString("make"));
+
+                car.setModel(
+                                resultSet.getString("model"));
+
+                car.setManufactureYear(
+                                resultSet.getInt("manufacture_year"));
+
+                // Vehicle identification
+
+                car.setVin(
+                                resultSet.getString("vin"));
+
+                car.setRegistrationNumber(
+                                resultSet.getString("registration_number"));
+
+                // Vehicle specifications
+
+                car.setFuelType(
+                                resultSet.getString("fuel_type"));
+
+                car.setTransmission(
+                                resultSet.getString("transmission"));
+
+                car.setColour(
+                                resultSet.getString("colour"));
+
+                // Financial information
+
+                car.setPurchasePrice(
+                                resultSet.getBigDecimal("purchase_price"));
+
+                car.setListingPrice(
+                                resultSet.getBigDecimal("listing_price"));
+
+                // Date information
+
+                car.setAcquisitionDate(
+                                getLocalDate(resultSet, "acquisition_date"));
+
+                // Status mapping
+
+                car.setStatus(
+                                CarStatus.fromDatabaseValue(
+                                                resultSet.getString("status")));
+
+                // Sale information
+
+                car.setSoldDate(
+                                getLocalDate(resultSet, "sold_date"));
+
+                car.setSoldPrice(
+                                resultSet.getBigDecimal("sold_price"));
+
+                // Additional information
+
+                car.setNotes(
+                                resultSet.getString("notes"));
+
+                return car;
         }
-    }
 
-    // ==========================================
-    // HELPER 7 - SET NULLABLE DATE
-    // ==========================================
+        // ==========================================
+        // HELPER 2 - SET CAR PARAMETERS
+        // ==========================================
 
-    private void setNullableDate(
-            PreparedStatement statement,
-            int index,
-            LocalDate date) throws SQLException {
+        private int setCarParameters(
+                        PreparedStatement statement,
+                        Car car,
+                        int startIndex) throws SQLException {
 
-        if (date == null) {
+                int index = startIndex;
 
-            statement.setNull(index, Types.DATE);
+                statement.setString(
+                                index++,
+                                trimToNull(car.getStockCode()));
 
-        } else {
+                statement.setString(
+                                index++,
+                                trimToNull(car.getName()));
 
-            statement.setDate(
-                    index,
-                    java.sql.Date.valueOf(date));
+                statement.setString(
+                                index++,
+                                trimToNull(car.getMake()));
+
+                statement.setString(
+                                index++,
+                                trimToNull(car.getModel()));
+
+                statement.setInt(
+                                index++,
+                                car.getManufactureYear());
+
+                // VIN
+                setNullableString(
+                                statement,
+                                index++,
+                                normalizeUpper(car.getVin()),
+                                Types.CHAR);
+
+                // Registration number
+                setNullableString(
+                                statement,
+                                index++,
+                                normalizeUpper(car.getRegistrationNumber()),
+                                Types.VARCHAR);
+
+                // Fuel type and transmission
+                statement.setString(
+                                index++,
+                                normalizeUpper(car.getFuelType()));
+
+                statement.setString(
+                                index++,
+                                normalizeUpper(car.getTransmission()));
+
+                // Colour
+                setNullableString(
+                                statement,
+                                index++,
+                                car.getColour(),
+                                Types.VARCHAR);
+
+                // Purchase price
+                statement.setBigDecimal(
+                                index++,
+                                car.getPurchasePrice());
+
+                // Acquisition date
+                setNullableDate(
+                                statement,
+                                index++,
+                                car.getAcquisitionDate());
+
+                // Listing price
+                statement.setBigDecimal(
+                                index++,
+                                car.getListingPrice());
+
+                // Status
+                statement.setString(
+                                index++,
+                                car.getStatus() == null
+                                                ? null
+                                                : car.getStatus().getDatabaseValue());
+
+                // Sold date
+                setNullableDate(
+                                statement,
+                                index++,
+                                car.getSoldDate());
+
+                // Sold price
+                statement.setBigDecimal(
+                                index++,
+                                car.getSoldPrice());
+
+                // Notes
+                String notes = car.getNotes();
+
+                statement.setString(
+                                index++,
+                                notes == null || notes.isBlank() ? null : notes);
+
+                return index;
         }
-    }
 
-    private LocalDate getLocalDate(
-            ResultSet resultSet,
-            String column) throws SQLException {
+        // ==========================================
+        // HELPER 3 - ADD SEARCH CONDITION
+        // ==========================================
 
-        java.sql.Date date = resultSet.getDate(column);
+        private void addCondition(
+                        StringBuilder sql,
+                        List<Object> parameters,
+                        String condition,
+                        Object value) {
 
-        return date == null
-                ? null
-                : date.toLocalDate();
-    }
+                if (parameters.isEmpty()) {
 
+                        sql.append(" WHERE ");
+
+                } else {
+
+                        sql.append(" AND ");
+                }
+
+                sql.append(condition);
+
+                parameters.add(value);
+        }
+
+        // ==========================================
+        // HELPER 4 - CHECK NON-EMPTY TEXT
+        // ==========================================
+
+        private boolean hasText(String value) {
+
+                return value != null && !value.isBlank();
+        }
+
+        // ==========================================
+        // HELPER 5 - NORMALIZE TEXT
+        // ==========================================
+
+        private String trimToNull(String value) {
+
+                if (value == null || value.isBlank()) {
+                        return null;
+                }
+
+                return value.trim();
+        }
+
+        private String normalizeUpper(String value) {
+
+                if (value == null || value.isBlank()) {
+                        return null;
+                }
+
+                return value.trim().toUpperCase(Locale.ROOT);
+        }
+
+        // ==========================================
+        // HELPER 6 - SET NULLABLE STRING
+        // ==========================================
+
+        private void setNullableString(
+                        PreparedStatement statement,
+                        int index,
+                        String value,
+                        int sqlType) throws SQLException {
+
+                if (value == null || value.isBlank()) {
+
+                        statement.setNull(index, sqlType);
+
+                } else {
+
+                        statement.setString(index, value.trim());
+                }
+        }
+
+        // ==========================================
+        // HELPER 7 - SET NULLABLE DATE
+        // ==========================================
+
+        private void setNullableDate(
+                        PreparedStatement statement,
+                        int index,
+                        LocalDate date) throws SQLException {
+
+                if (date == null) {
+
+                        statement.setNull(index, Types.DATE);
+
+                } else {
+
+                        statement.setDate(
+                                        index,
+                                        java.sql.Date.valueOf(date));
+                }
+        }
+
+        private LocalDate getLocalDate(
+                        ResultSet resultSet,
+                        String column) throws SQLException {
+
+                java.sql.Date date = resultSet.getDate(column);
+
+                return date == null
+                                ? null
+                                : date.toLocalDate();
+        }
+
+        @Override
+        public Optional<Car> findByStockCode(String stockCode) {
+
+                String sql = "SELECT * FROM cars WHERE stock_code = ?";
+
+                try (Connection connection = ConnectionFactory.getConnection();
+                                PreparedStatement statement = connection.prepareStatement(sql)) {
+
+                        statement.setString(1, stockCode);
+
+                        try (ResultSet resultSet = statement.executeQuery()) {
+
+                                if (resultSet.next()) {
+                                        return Optional.of(mapRow(resultSet));
+                                }
+
+                                return Optional.empty();
+                        }
+
+                } catch (SQLException e) {
+                        throw new DataAccessException(
+                                        "Failed to find car using stock code: " + stockCode, e);
+                }
+        }
 }

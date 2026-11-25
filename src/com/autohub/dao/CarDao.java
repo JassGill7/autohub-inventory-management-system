@@ -25,4 +25,6 @@ public interface CarDao {
     // Retrieve all cars from the database
     List<Car> findAll();
 
+    Optional<Car> findByStockCode(String stockCode);
+
 }

@@ -1,4 +1,3 @@
-
 package com.autohub.test;
 
 import com.autohub.dao.CarDao;
@@ -17,150 +16,187 @@ import java.util.UUID;
 
 public class CarRegistrationTest {
 
-    public static void main(String[] args) {
+        public static void main(String[] args) {
 
-        // Create dependencies
-        CarDao carDao = new JdbcCarDao();
+                // Create dependencies
+                CarDao carDao = new JdbcCarDao();
 
-        CarValidator validator = new CarValidator();
+                CarValidator validator = new CarValidator();
 
-        CarService carService =
-                new CarService(carDao, validator);
+                CarService carService = new CarService(carDao, validator);
 
+                // Create a new car object
+                Car car = new Car();
 
-        // Create a new car object
-        Car car = new Car();
+                // Generate a unique stock code for repeated testing
+                String stockCode = "AH-TEST-"
+                                + UUID.randomUUID()
+                                                .toString()
+                                                .substring(0, 8)
+                                                .toUpperCase();
 
-        // Generate a unique stock code for repeated testing
-        String stockCode = "AH-TEST-"
-                + UUID.randomUUID()
-                .toString()
-                .substring(0, 8)
-                .toUpperCase();
+                car.setStockCode(stockCode);
 
-        car.setStockCode(stockCode);
+                car.setName("Toyota Fortuner Legender");
 
-        car.setName("Toyota Fortuner Legender");
+                car.setMake("Toyota");
 
-        car.setMake("Toyota");
+                car.setModel("Fortuner");
 
-        car.setModel("Fortuner");
+                car.setManufactureYear(2023);
 
-        car.setManufactureYear(2023);
+                car.setFuelType("D");
 
-        car.setFuelType("D");
+                car.setTransmission("A");
 
-        car.setTransmission("A");
+                car.setColour("Black");
 
-        car.setColour("Black");
+                car.setPurchasePrice(
+                                new BigDecimal("3200000.00"));
 
-        car.setPurchasePrice(
-                new BigDecimal("3200000.00")
-        );
+                car.setAcquisitionDate(
+                                LocalDate.now().minusDays(10));
 
-        car.setAcquisitionDate(
-                LocalDate.now().minusDays(10)
-        );
+                car.setListingPrice(
+                                new BigDecimal("3500000.00"));
 
-        car.setListingPrice(
-                new BigDecimal("3500000.00")
-        );
+                car.setStatus(CarStatus.AVAILABLE);
 
-        car.setStatus(CarStatus.AVAILABLE);
+                car.setNotes("AutoHub registration test");
 
-        car.setNotes("AutoHub registration test");
+                try {
 
+                        System.out.println(
+                                        "========== CAR REGISTRATION TEST ==========");
 
-        try {
+                        // Register car
+                        long generatedId = carService.registerCar(car);
 
-            System.out.println(
-                    "========== CAR REGISTRATION TEST =========="
-            );
+                        System.out.println(
+                                        "\nCar registered successfully!");
 
-            // Register car
-            long generatedId =
-                    carService.registerCar(car);
+                        System.out.println(
+                                        "Generated Car ID: " + generatedId);
 
-            System.out.println(
-                    "\nCar registered successfully!"
-            );
+                        System.out.println(
+                                        "Stock Code: " + stockCode);
 
-            System.out.println(
-                    "Generated Car ID: " + generatedId
-            );
+                        // Verify ID was assigned to original object
+                        System.out.println(
+                                        "Object Car ID: " + car.getCarId());
 
-            System.out.println(
-                    "Stock Code: " + stockCode
-            );
+                        // Retrieve inserted car from MySQL
+                        Optional<Car> savedCar = carDao.findById(generatedId);
 
-            // Verify ID was assigned to original object
-            System.out.println(
-                    "Object Car ID: " + car.getCarId()
-            );
+                        if (savedCar.isEmpty()) {
 
+                                throw new AssertionError(
+                                                "Registered car could not be retrieved.");
+                        }
 
-            // Retrieve inserted car from MySQL
-            Optional<Car> savedCar =
-                    carDao.findById(generatedId);
+                        Car retrievedCar = savedCar.get();
 
-            if (savedCar.isEmpty()) {
+                        // Verify retrieved information
+                        if (!stockCode.equals(retrievedCar.getStockCode())) {
 
-                throw new AssertionError(
-                        "Registered car could not be retrieved."
-                );
-            }
+                                throw new AssertionError(
+                                                "Stock code verification failed.");
+                        }
 
-            Car retrievedCar = savedCar.get();
+                        if (!"Toyota".equals(retrievedCar.getMake())) {
 
+                                throw new AssertionError(
+                                                "Make verification failed.");
+                        }
 
-            // Verify retrieved information
-            if (!stockCode.equals(retrievedCar.getStockCode())) {
+                        if (!new BigDecimal("3500000.00")
+                                        .equals(retrievedCar.getListingPrice())) {
 
-                throw new AssertionError(
-                        "Stock code verification failed."
-                );
-            }
+                                throw new AssertionError(
+                                                "Listing price verification failed.");
+                        }
 
-            if (!"Toyota".equals(retrievedCar.getMake())) {
+                        System.out.println(
+                                        "\nDatabase retrieval successful!");
 
-                throw new AssertionError(
-                        "Make verification failed."
-                );
-            }
+                        System.out.println(
+                                        "\nRetrieved Vehicle Details:");
 
-            if (!new BigDecimal("3500000.00")
-                    .equals(retrievedCar.getListingPrice())) {
+                        System.out.println(retrievedCar);
 
-                throw new AssertionError(
-                        "Listing price verification failed."
-                );
-            }
+                        // =========================================
+                        // STEP 4: TEST SEARCH BY CAR ID
+                        // =========================================
 
+                        Optional<Car> carById = carService.findCarById(generatedId);
 
-            System.out.println(
-                    "\nDatabase retrieval successful!"
-            );
+                        if (carById.isEmpty()) {
 
-            System.out.println(
-                    "\nRetrieved Vehicle Details:"
-            );
+                                throw new AssertionError(
+                                                "Search by ID failed!");
+                        }
 
-            System.out.println(retrievedCar);
+                        if (carById.get().getCarId() != generatedId) {
 
+                                throw new AssertionError(
+                                                "Incorrect car returned by ID!");
+                        }
 
-            System.out.println(
-                    "\nREGISTRATION TEST PASSED!"
-            );
+                        System.out.println(
+                                        "\nSearch by ID successful!");
 
-        } catch (Exception e) {
+                        // =========================================
+                        // STEP 4: TEST SEARCH BY STOCK CODE
+                        // =========================================
 
-            System.out.println(
-                    "\nREGISTRATION TEST FAILED!"
-            );
+                        Optional<Car> carByStockCode = carService.findCarByStockCode(stockCode);
 
-            e.printStackTrace();
+                        if (carByStockCode.isEmpty()) {
 
-            System.exit(1);
+                                throw new AssertionError(
+                                                "Search by stock code failed!");
+                        }
+
+                        if (carByStockCode.get().getCarId() != generatedId) {
+
+                                throw new AssertionError(
+                                                "Incorrect car returned by stock code!");
+                        }
+
+                        System.out.println(
+                                        "Search by stock code successful!");
+
+                        // =========================================
+                        // STEP 4: TEST NONEXISTENT STOCK CODE
+                        // =========================================
+
+                        Optional<Car> missingCar = carService.findCarByStockCode(
+                                        "AH-NONEXISTENT");
+
+                        if (missingCar.isPresent()) {
+
+                                throw new AssertionError(
+                                                "Nonexistent stock code returned a car!");
+                        }
+
+                        System.out.println(
+                                        "Nonexistent stock code handled correctly!");
+
+                        // =========================================
+                        // ALL TESTS PASSED
+                        // =========================================
+
+                        System.out.println(
+                                        "\nREGISTRATION AND SEARCH TESTS PASSED!");
+
+                } catch (Exception | AssertionError e) {
+
+                        System.out.println(
+                                        "\nREGISTRATION OR SEARCH TEST FAILED!");
+
+                        e.printStackTrace();
+
+                        System.exit(1);
+                }
         }
-    }
 }
